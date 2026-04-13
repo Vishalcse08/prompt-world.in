@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../UserContext';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Sparkles, Copy, Check, Info, AlertTriangle, Zap, Terminal, Code2, Type } from 'lucide-react';
-import { supabase } from '../Supabase';
 
 const PromptGenerator = () => {
-  const { credits, setCredits, addProject, projects } = useUser();
+  const { credits, setCredits, addProject, projects, user: authUser } = useUser();
   const location = useLocation();
+  const navigate = useNavigate();
   
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState(null);
   const [currentProjectId, setCurrentProjectId] = useState(null);
+
   
   const [formData, setFormData] = useState({
     projectIdea: '',
@@ -56,20 +57,25 @@ const PromptGenerator = () => {
   };
 
   const handleGenerate = async () => {
+    if (authUser && !authUser.is_admin && credits < 500) {
+      navigate('/dashboard/pricing');
+      return;
+    }
+
     setError(null);
     setLoading(true);
     setOutput('');
 
     try {
-      const { data: { session } } = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const token = localStorage.getItem('token');
       
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/generate`, {
+      const response = await fetch(`http://localhost:5000/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || 'mock-token'}`
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ ...formData, id: currentProjectId })
       });
 
       const data = await response.json();
@@ -89,8 +95,10 @@ const PromptGenerator = () => {
           setCurrentProjectId(Date.now()); 
       }
 
-    } catch (err) {
-      setError(err.message);
+    } catch (apiErr) {
+      console.error('Generation API call failed:', apiErr);
+      console.warn('API Error, using fallback');
+      setOutput({ text: "The AI generation service is currently experiencing issues. Here is a fallback template while we restore service.", json: "{}", yaml: "" });
     } finally {
       setLoading(false);
     }
@@ -297,7 +305,7 @@ const PromptGenerator = () => {
             
             <div className="flex items-center justify-center gap-2 text-[10px] text-foreground/50 font-bold uppercase tracking-widest">
                 <Zap size={10} className="fill-current" />
-                Deducts 500 Tokens
+                {authUser?.is_admin ? 'Admin Bypass Active' : 'Deducts 500 Tokens'}
             </div>
           </div>
         </div>

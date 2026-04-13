@@ -1,12 +1,19 @@
 import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { LayoutDashboard, Folder, HelpCircle, Columns, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Folder, HelpCircle, Columns, Settings, ShieldCheck } from 'lucide-react';
+import { useUser } from '../UserContext';
 
 const SideNav = ({ collapsed, setCollapsed, isMobileOpen, setIsMobileOpen }) => {
+  const { user } = useUser();
+  
   const navItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { name: 'Projects', icon: Folder, path: '/dashboard/projects' },
   ];
+
+  if (user?.is_admin) {
+    navItems.push({ name: 'Admin', icon: ShieldCheck, path: '/dashboard/admin' });
+  }
 
   return (
     <aside 

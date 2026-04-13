@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useUser } from '../UserContext';
 import { Zap, ShieldCheck, Check, Info, AlertCircle, ShoppingCart } from 'lucide-react';
-import { supabase } from '../Supabase';
 
 const PricingCard = ({ title, tokens, price, description, highlight, onBuy, loading }) => (
   <div className={`glass p-8 rounded-[2rem] border-foreground/5 relative flex flex-col h-full bg-gradient-to-b ${highlight ? 'from-primary/10 to-transparent border-primary/20 shadow-[0_20px_50px_rgba(173,255,0,0.1)]' : 'from-white/2 to-transparent'}`}>
@@ -62,12 +61,12 @@ const PricingPage = () => {
   const handleBuyTokens = async (amount) => {
     setLoading(amount);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/buy-tokens`, {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/buy-tokens`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ amount })
       });

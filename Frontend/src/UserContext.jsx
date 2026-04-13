@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from './Supabase';
+import axios from 'axios';
 
 const UserContext = createContext();
+
+const API_URL = 'http://localhost:5000';
 
 export const UserProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -24,65 +26,135 @@ export const UserProvider = ({ children }) => {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  // Check auth on load
   useEffect(() => {
-    if (!supabase) {
-        // Temporary: Mock user for testing
-        setUser({ 
-            id: 'mock-user-id', 
-            email: 'test@example.com',
-            user_metadata: { full_name: 'Test Administrator' }
-        });
-        setLoading(false);
-        setCredits(100000);
-        return;
-    }
-    
-    // Check active sessions
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-          setLoading(false);
-          setCredits(100000); // Mock
-      } else {
-          setLoading(false);
-      }
-    });
-
-    const result = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        setCredits(100000); // Mock
-      } else {
-        setCredits(0);
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const res = await axios.get(`${API_URL}/api/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setUser(res.data);
+          setCredits(res.data.credits);
+          
+          // Fetch projects
+          const projRes = await axios.get(`${API_URL}/projects`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          // Map DB fields to Frontend expected fields
+          const mappedProjects = projRes.data.map(p => ({
+              id: p.id,
+              title: p.name,
+              projectIdea: p.name,
+              platform: p.platform || 'Claude',
+              appType: p.app_type || 'Dashboard',
+              output: {
+                  text: p.prompt_text,
+                  json: p.prompt_json,
+                  yaml: p.prompt_yaml
+              },
+              createdAt: p.created_at,
+              description: p.name
+          }));
+          
+          setProjects(mappedProjects);
+        } catch (err) {
+          console.error('Auth verification failed:', err);
+          localStorage.removeItem('token');
+          setUser(null);
+        }
       }
       setLoading(false);
-    });
-
-    const subscription = result.data?.subscription || result.subscription;
-
-    return () => {
-        if (subscription && typeof subscription.unsubscribe === 'function') {
-            subscription.unsubscribe();
-        }
     };
+    checkAuth();
   }, []);
+
+  const login = async (email, password) => {
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/login`, { email, password });
+      localStorage.setItem('token', res.data.token);
+      setUser(res.data.user);
+      
+      const [profile, projRes] = await Promise.all([
+        axios.get(`${API_URL}/api/auth/me`, { headers: { Authorization: `Bearer ${res.data.token}` } }),
+        axios.get(`${API_URL}/projects`, { headers: { Authorization: `Bearer ${res.data.token}` } })
+      ]);
+
+      const mappedProjects = projRes.data.map(p => ({
+          id: p.id,
+          title: p.name,
+          projectIdea: p.name,
+          platform: p.platform || 'Claude',
+          appType: p.app_type || 'Dashboard',
+          output: {
+              text: p.prompt_text,
+              json: p.prompt_json,
+              yaml: p.prompt_yaml
+          },
+          createdAt: p.created_at,
+          description: p.name
+      }));
+
+      setUser(profile.data);
+      setCredits(profile.data.credits);
+      setProjects(mappedProjects);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Login failed' };
+    }
+  };
+
+  const register = async (email, password) => {
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/register`, { email, password });
+      localStorage.setItem('token', res.data.token);
+      setUser(res.data.user);
+      
+      const profile = await axios.get(`${API_URL}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${res.data.token}` }
+      });
+      setUser(profile.data);
+      setCredits(profile.data.credits);
+      setProjects([]); // New user has no projects
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Registration failed' };
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+    setCredits(0);
+  };
 
   const addProject = (project) => {
       setProjects(prev => {
-          // Check if project with this ID exists
-          const existsIndex = prev.findIndex(p => p.id === project.id);
-          if (existsIndex !== -1 && project.id) {
-              const updated = [...prev];
-              updated[existsIndex] = { ...updated[existsIndex], ...project, updatedAt: new Date() };
-              return updated;
+          const exists = prev.find(p => p.id === project.id);
+          if (exists) {
+              return prev.map(p => p.id === project.id ? { ...p, ...project } : p);
           }
-          // Otherwise add as new
           return [{ ...project, id: project.id || Date.now(), createdAt: new Date() }, ...prev];
       });
   };
 
   return (
-    <UserContext.Provider value={{ user, credits, setCredits, loading, projects, addProject, theme, setTheme }}>
+    <UserContext.Provider value={{ 
+      user, 
+      credits, 
+      setCredits, 
+      loading, 
+      projects, 
+      setProjects,
+      addProject, 
+      theme, 
+      setTheme,
+      login,
+      register,
+      logout
+    }}>
       {children}
     </UserContext.Provider>
   );

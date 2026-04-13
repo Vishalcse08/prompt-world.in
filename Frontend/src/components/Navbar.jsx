@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '../UserContext';
 import { useNavigate } from 'react-router-dom';
-import { Search, Moon, Sun, Monitor, ChevronDown, Menu, Folder, Zap, Command, X, Sparkles, LayoutGrid } from 'lucide-react';
+import { Search, Moon, Sun, Monitor, ChevronDown, Menu, Folder, Zap, Command, X, Sparkles, LayoutGrid, LogOut } from 'lucide-react';
 
 const Navbar = ({ onMenuClick }) => {
-  const { credits, user, theme, setTheme, projects } = useUser();
+  const { credits, user, theme, setTheme, projects, logout } = useUser();
   const navigate = useNavigate();
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showResults, setShowResults] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const searchRef = useRef(null);
 
   useEffect(() => {
@@ -157,9 +158,42 @@ const Navbar = ({ onMenuClick }) => {
                 </>
             )}
         </div>
-        
-        <div className="h-10 w-10 bg-gradient-to-br from-green-500 to-primary rounded-full flex items-center justify-center text-black font-bold text-sm border-2 border-[#030303] shadow-lg">
-            {user?.user_metadata?.full_name?.[0] || 'V'}
+
+        {/* User Info & Dropdown */}
+        <div className="relative group">
+            <button 
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="h-10 w-10 bg-gradient-to-br from-green-500 to-primary rounded-full flex items-center justify-center text-black font-bold text-sm border-2 border-[#030303] shadow-lg hover:scale-105 transition-transform"
+            >
+                {user?.email?.[0].toUpperCase() || 'V'}
+            </button>
+
+            {showUserMenu && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)}></div>
+                    <div className="absolute right-0 mt-3 w-56 bg-surface border border-foreground/10 rounded-2xl p-2 shadow-2xl z-50 animate-modal-in">
+                        <div className="px-4 py-3 border-b border-foreground/5 mb-1 text-left">
+                            <p className="text-xs font-bold text-zinc-600 uppercase tracking-widest mb-1">Signed in as</p>
+                            <p className="text-sm font-semibold truncate">{user?.email}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                                <Zap size={14} className="text-primary fill-primary/20" />
+                                <span className="text-xs font-bold text-primary">{credits} Tokens</span>
+                            </div>
+                        </div>
+                        
+                        <button
+                            onClick={() => {
+                                logout();
+                                navigate('/login');
+                            }}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-500 hover:bg-red-500/10 transition-all font-medium"
+                        >
+                            <LogOut size={16} />
+                            Log Out
+                        </button>
+                    </div>
+                </>
+            )}
         </div>
       </div>
     </header>

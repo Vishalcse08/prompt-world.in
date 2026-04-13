@@ -1,10 +1,11 @@
 import React from 'react';
 import { useUser } from '../UserContext';
 import { LayoutGrid, Sparkles, Zap, ArrowUpRight, Folder, Info } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const DashboardHome = () => {
   const { user, credits, projects } = useUser();
+  const navigate = useNavigate();
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -92,18 +93,24 @@ const DashboardHome = () => {
                   </div>
               ) : (
                   projects.slice(0, 3).map(proj => (
-                      <div key={proj.id} className="flex items-center justify-between p-4 bg-foreground/5 rounded-2xl border border-foreground/5">
+                      <div 
+                        key={proj.id} 
+                        onClick={() => {
+                            navigate('/dashboard/projects/new', { state: { ...proj } });
+                        }}
+                        className="flex items-center justify-between p-4 bg-foreground/5 rounded-2xl border border-foreground/5 cursor-pointer hover:border-primary/30 transition-all group"
+                      >
                           <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-black transition-all">
                                   <Folder size={18} />
                               </div>
                               <div>
-                                  <div className="text-sm font-bold">{proj.title}</div>
-                                  <div className="text-[10px] text-zinc-600 uppercase tracking-widest">{proj.appType}</div>
+                                  <div className="text-sm font-bold group-hover:text-primary transition-colors">{proj.title || proj.name}</div>
+                                  <div className="text-[10px] text-zinc-600 uppercase tracking-widest">{proj.appType || 'AI Project'}</div>
                               </div>
                           </div>
-                          <div className="text-[10px] text-zinc-600">
-                             {new Date(proj.createdAt).toLocaleTimeString()}
+                          <div className="text-[10px] text-zinc-600 group-hover:text-foreground/60 transition-colors">
+                             {new Date(proj.created_at || proj.createdAt).toLocaleDateString()}
                           </div>
                       </div>
                   ))

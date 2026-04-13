@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Zap, MessageSquare, CheckCircle2, Crown, X, ChevronDown, Folder, Globe, Smartphone, Bot } from 'lucide-react';
 
 const Projects = () => {
-  const { user, projects, addProject } = useUser();
+  const { user, projects, addProject, credits } = useUser();
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -53,12 +53,12 @@ const Projects = () => {
                 <span className="text-foreground/80">Project Usage</span>
                 <span className="text-foreground/50 ml-2 md:ml-4 font-black">STARTER</span>
             </div>
-            <div className="text-foreground/50">{projects.length}/10</div>
+            <div className="text-foreground/50">{projects.length}/2</div>
         </div>
         <div className="h-2 bg-[#1a1a1a] rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-primary/30 to-primary rounded-full shadow-[0_0_10px_rgba(173,255,0,0.2)]" style={{ width: `${(projects.length / 10) * 100}%` }}></div>
+            <div className="h-full bg-gradient-to-r from-primary/30 to-primary rounded-full shadow-[0_0_10px_rgba(173,255,0,0.2)]" style={{ width: `${(projects.length / 2) * 100}%` }}></div>
         </div>
-        <p className="text-[11px] text-zinc-600 font-bold uppercase">{10 - projects.length} project slots remaining</p>
+        <p className="text-[11px] text-zinc-600 font-bold uppercase">{Math.max(0, 2 - projects.length)} project slots remaining</p>
       </div>
 
       {/* Stats Grid */}
@@ -125,14 +125,32 @@ const Projects = () => {
               ))}
 
               {/* New Project Button Card */}
-              <button
-                onClick={() => setShowModal(true)}
-                className="aspect-square border-2 border-dashed border-foreground/5 hover:border-primary/20 hover:bg-foreground/5 rounded-[2.5rem] flex items-center justify-center group transition-all"
-              >
-                  <div className="w-14 h-14 bg-foreground/5 rounded-2xl flex items-center justify-center text-foreground/50 group-hover:scale-110 group-hover:bg-primary group-hover:text-black transition-all duration-300">
-                      <Plus size={32} />
+              {(!user?.is_admin && projects.length >= 2) ? (
+                  <div className="aspect-square border-2 border-dashed border-red-500/20 bg-red-500/5 rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center gap-4">
+                        <div className="w-12 h-12 bg-red-500/20 rounded-2xl flex items-center justify-center text-red-500">
+                            <Plus size={24} className="rotate-45" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-red-100 mb-1">Limit Reached</p>
+                            <p className="text-[10px] text-red-400 font-medium">Upgrade to create more than 2 projects</p>
+                        </div>
                   </div>
-              </button>
+              ) : (
+                  <button
+                    onClick={() => {
+                        if (!user?.is_admin && credits < 500) {
+                            navigate('/dashboard/pricing');
+                            return;
+                        }
+                        setShowModal(true);
+                    }}
+                    className="aspect-square border-2 border-dashed border-foreground/5 hover:border-primary/20 hover:bg-foreground/5 rounded-[2.5rem] flex items-center justify-center group transition-all"
+                  >
+                      <div className="w-14 h-14 bg-foreground/5 rounded-2xl flex items-center justify-center text-foreground/50 group-hover:scale-110 group-hover:bg-primary group-hover:text-black transition-all duration-300">
+                          <Plus size={32} />
+                      </div>
+                  </button>
+              )}
           </div>
       </div>
 
