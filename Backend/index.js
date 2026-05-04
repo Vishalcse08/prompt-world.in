@@ -9,12 +9,18 @@ const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+const JWT_SECRET = process.env.JWT_SECRET?.trim() || 'fallback_secret';
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY?.trim();
+const CLIENT_URL = process.env.CLIENT_URL?.trim() || 'http://localhost:5173';
+
+if (!OPENROUTER_API_KEY) {
+  console.error('Missing OPENROUTER_API_KEY. Please set it in .env without extra whitespace.');
+}
 
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CLIENT_URL || '*'
+  origin: CLIENT_URL
 }));
 app.use(express.json());
 
@@ -178,14 +184,19 @@ app.post('/generate', verifyJWT, async (req, res) => {
     FINAL RULE: Do not include any talk before or after the JSON. Start with { and end with }.`;
 
     let output;
+    let generationSucceeded = false;
     try {
+      if (!OPENROUTER_API_KEY) {
+        throw new Error('OpenRouter API key is not configured');
+      }
+
       const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
         model: "google/gemini-2.0-flash-001",
         messages: [{ role: "user", content: systemPrompt }]
       }, {
         headers: {
-          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "HTTP-Referer": process.env.CLIENT_URL || "http://localhost:5173",
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          Referer: CLIENT_URL,
           "Content-Type": "application/json"
         }
       });
@@ -209,9 +220,10 @@ app.post('/generate', verifyJWT, async (req, res) => {
           yaml: content 
         };
       }
+      generationSucceeded = true;
     } catch (apiErr) {
       console.error('Generation API call failed:', apiErr.message, apiErr.response?.data);
-      output = { text: "Generation failed", json: {}, yaml: "" };
+      return res.status(502).json({ error: 'AI generation service failed. Please try again.' });
     }
 
     // Deduct tokens (Admins bypass)
@@ -220,18 +232,20 @@ app.post('/generate', verifyJWT, async (req, res) => {
     }
 
     let finalProjectId;
+    const projectName = projectIdea.length > 250 ? projectIdea.substring(0, 250) + '...' : projectIdea;
+
     if (req.body.id) {
         // Update existing project
         await db.query(
             'UPDATE projects SET name = $1, platform = $2, app_type = $3, prompt_text = $4, prompt_json = $5, prompt_yaml = $6 WHERE id = $7 AND user_id = $8',
-            [projectIdea, platform, appType, output.text, JSON.stringify(output.json), output.yaml, req.body.id, req.user.id]
+            [projectName, platform, appType, output.text, JSON.stringify(output.json), output.yaml, req.body.id, req.user.id]
         );
         finalProjectId = req.body.id;
     } else {
         // Save new project
         const projectResult = await db.query(
             'INSERT INTO projects (user_id, name, platform, app_type, prompt_text, prompt_json, prompt_yaml) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-            [req.user.id, projectIdea, platform, appType, output.text, JSON.stringify(output.json), output.yaml]
+            [req.user.id, projectName, platform, appType, output.text, JSON.stringify(output.json), output.yaml]
         );
         finalProjectId = projectResult.rows[0].id;
     }

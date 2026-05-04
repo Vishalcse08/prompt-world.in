@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '../UserContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sparkles, Copy, Check, Info, AlertTriangle, Zap, Terminal, Code2, Type } from 'lucide-react';
@@ -12,6 +12,7 @@ const PromptGenerator = () => {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState(null);
   const [currentProjectId, setCurrentProjectId] = useState(null);
+  const isGenerating = useRef(false);
 
   
   const [formData, setFormData] = useState({
@@ -57,11 +58,15 @@ const PromptGenerator = () => {
   };
 
   const handleGenerate = async () => {
+    // Guard against duplicate/concurrent calls
+    if (isGenerating.current) return;
+
     if (authUser && !authUser.is_admin && credits < 500) {
       navigate('/dashboard/pricing');
       return;
     }
 
+    isGenerating.current = true;
     setError(null);
     setLoading(true);
     setOutput('');
@@ -84,23 +89,24 @@ const PromptGenerator = () => {
       setOutput(data.output);
       setCredits(data.newCredits);
 
+      // Use the real project ID returned by the server
+      const serverProjectId = data.projectId;
+      setCurrentProjectId(serverProjectId);
+
       addProject({
           ...formData,
           output: data.output,
-          title: formData.title || formData.projectIdea.substring(0, 20) + '...',
-          id: currentProjectId 
+          title: formData.title || formData.projectIdea.substring(0, 50) + '...',
+          id: serverProjectId
       });
-
-      if (!currentProjectId) {
-          setCurrentProjectId(Date.now()); 
-      }
 
     } catch (apiErr) {
       console.error('Generation API call failed:', apiErr);
-      console.warn('API Error, using fallback');
-      setOutput({ text: "The AI generation service is currently experiencing issues. Here is a fallback template while we restore service.", json: "{}", yaml: "" });
+      setError(apiErr.message || 'Generation failed. Please try again.');
+      // Do NOT set a fallback output — keep the panel empty so the user knows it failed
     } finally {
       setLoading(false);
+      isGenerating.current = false;
     }
   };
 

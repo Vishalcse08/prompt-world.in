@@ -1,8 +1,8 @@
-# dependencies
-node_modules/
 
-# environment variables
+.env.*
 .env
-.env.local
-.env.* 
-!.env.example
+node_modules/
+dist/
+logs/
+*.log
+*.env
